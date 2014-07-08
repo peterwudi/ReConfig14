@@ -2,6 +2,9 @@
 
 \usepackage{graphicx}
 \usepackage{amsmath,epsfig}
+\usepackage[justification=centering]{caption}
+
+
 \hyphenation{Tam-pe-re micro-soft}
 
 \newcommand{\kfig}[4]{ % params: file, label, caption
@@ -49,27 +52,30 @@ Current commercial soft processors such as Altera's Nios~II~\cite{niosii} and Xi
 
 Wu et al. limits the hardware budget of the gRselect predictor to one M9K Block RAM~\cite{StratixIVM9K} on Altera Stratix IV devices, which is the same hardware budget as Nios~II-f. Such a small hardware budget prohibits more elaborated and accurate branch prediction schemes such as perceptron~\cite{perceptron} and TAGE~\cite{tage}. This work looses the hardware budget constraint and investigates FPGA-friendly implementations of perceptron and TAGE predictors. This work also assumes a pipelined processor implementation representative of Altera's Nios~II-f for comparison versus gRselect.
 
-Specifically, this work makes the following contributions: (1)~It studies the FPGA implementation of the perceptron predictor and TAGE predictor for branch direction prediction. It shows that comparing the accuracy versus gRselect, perceptron is ~1\% worse while TAGE is ~1\% better, assuming these predictors can be accessed in a single cycle.
+Specifically, this work makes the following contributions: (1)~It studies the FPGA implementation of the perceptron predictor and TAGE predictor, including many optimizations to improve maximum frequency of these predictors. (2)~It shows that comparing the branch direction prediction accuracy over the benchmarks versus gRselect, perceptron is \~1\% worse while TAGE is \~1\% better, assuming these predictors can be accessed in a single cycle. (3)~It discovered that TAGE is too slow for single-cycle access, so in reality TAGE can only provide a prediction in two cycles. This work proposes an overriding predictor that uses a simple base predictor to provide a base prediction in the first cycle, then override that decision should TAGE disagree with the base predictor in the second cycle. It shows that the overriding TAGE predictor achieves 5.2\% better instruction throughput over gRselect.
 
+\section{Background and Goals}
+\label{sec:background}
 
+% Di: this section is based on the background section from the grselect paper. I've removed/modified some details not relevant to this paper (BTB and RAS), but the paragraph is mostly the same. I'm leaving it this way for now, probably should rephrase the paragraph later.
 
+Fig.~\ref{fig:bpcanonical} shows the organization of a typical branch predictor comprising a direction predictor and a target predictor.  The predictor operates in the fetch stage where it aims to predict the program counter (PC), that is the address in memory, of the instruction to fetch in the next cycle using the current instruction's PC and other dynamically collected information. The direction predictor guesses whether the branch will be taken or not. The target predictor guesses the address for predicted as taken branches and function returns respectively. The multiplexer at the end selects based on the branch type and the direction prediction whether the target is the fall through address (PC+4 in Nios~II) or the target predicted by the target predictor. Since, at this point in time, the actual instruction is not available in a typical ASIC implementation, it is not directly possible to determine whether the instruction is a return, a branch, or some other instruction. Accordingly, a Selection Logic block uses either pre-decode information or a PC-based, dynamically populated lookup table to guess which target is best to use. With the latter scheme, when no entry exists in the lookup table, some default action is taken until the first time a branch is encountered. Once the branch executes, its type is stored in the lookup table where it serves to identify the branch type on subsequent encounters. This scheme is not perfectly accurate due to aliasing.
+\kfig{bpcanonical.pdf}{fig:bpcanonical}{Canonical Branch Predictor.}{angle = 0, trim = 0.2in 1.7in 0.4in 0.1in, clip, width=0.4\textwidth}
 
+\subsection{Design Goals}
+\label{sec:background:goal}
 
-
-
-\subsection{Subsection Heading Here}
-Subsection text here.
-
-
-\subsubsection{Subsubsection Heading Here}
-Subsubsection text here.
-
-
-
-
+This work aims to implement perceptron and TAGE that has high operating frequency as well as accuracy to maximize execution performance. As section~\ref{sec:tage} will show, a single-cycle TAGE is prohibitively slow. Therefore, this work proposes an overriding TAGE predictor that produces a base prediction in one cycle and overrides that decision with a better prediction if the later prediction differs from the base prediction. Since perceptron and TAGE both requires large storage spaces, on-chip resources is not the main concern of this paper.
 
 \section{Perceptron Predictor}
 \label{sec:advanced:perceptron}
+The perceptron predictor use vectors of weights (i.e., perceptrons) to represent correlations among branch instructions~\cite{perceptron}. Fig.~\ref{fig:perceptron} shows the structure of a perceptron predictor.
+
+Perceptron uses a table to store vectors of weights. When making a prediction, a weight vector is loaded from the table, and each weight is multiplied by the corresponding global branch history (i.e. 1 if taken and -1 if not-taken) from the GHR. Finally, the multiplication results are summed up, and perceptron predicts taken if the sum is positive, and not taken otherwise.
+\kfig{perceptron.pdf}{fig:perceptron}{The preceptron branch predictor.}{angle = 0, trim = 1in 3.5in 2in 1in, clip, width=0.4\textwidth}
+
+
+
 Section~\ref{sec:background:dirpred:perceptron} introduced that perceptron predictor maintains vectors of weights in a table. It produces a prediction through the following steps: (1)~a vector of weight (i.e., a perceptron) is loaded from the table. (2)~multiply the weights with their corresponding global history (1 for taken and -1 for not-taken). (3)~sum up all the products, predict taken if the sum is positive, and not-taken otherwise. Each of these steps poses difficulties to map to the FPGA platform. The rest of this section addresses these problems.
 
 \subsection{Perceptron Table Organization}
@@ -102,7 +108,10 @@ As Fig.~\ref{perceptronBRAM} shows,
 
 \section{TAgged GEometric history length Branch Predictor (TAGE)}
 \label{sec:advanced:tage}
+The TAGE predictor features a bimodal predictor as base predictor $T_0$ to provide a basic prediction and a set of $M$ tagged predictor components $T_i$~\cite{tage}. These tagged predictor components $T_i$, where $1\leq i\leq M$, are indexed with hash functions of the branch address and the global branch/path history with various length. The global history lengths used for computing the indexing functions for tables $T_i$ form a geometric series, i.e., $L(i) = (int)(\alpha^{i{}^{\_}1}\times L(1)+0.5)$. TAGE achieves its high accuracy by utilizing very long history lengths
 
+Fig.~\ref{fig:tage} shows a 5-component TAGE predictor. Each table entry has a 3-bit saturating counter \textit{ctr} for prediction result, a \textit{tag}, and a 2-bit useful counter \textit{u}. The indices of the tables are produced by hashing PC and global history with various lengths. A valid prediction result from each table is provided only on a tag match (i.e. a hit). The final prediction of TAGE comes from the hitting tagged predictor component that uses the longest history.
+\kfig{tage.pdf}{fig:tage}{A 5-component TAGE branch predictor.}{angle = 0, trim = 0.6in 0.6in 0.4in 0.2in, clip, width=0.4\textwidth}
 
 
 
