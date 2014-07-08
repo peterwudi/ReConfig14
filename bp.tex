@@ -57,7 +57,7 @@ Specifically, this work makes the following contributions: (1)~It studies the FP
 \section{Background and Goals}
 \label{sec:background}
 
-% Di: this section is based on the background section from the grselect paper. I've removed/modified some details not relevant to this paper (BTB and RAS), but the paragraph is mostly the same. I'm leaving it this way for now, probably should rephrase the paragraph later.
+% Di: this section is based on the background section from the grselect paper. I've removed/modified some details not relevant to this paper (BTB and RAS), but the paragraph is mostly the same. I'm leaving it this way for now, probably should rephrase the paragraph later?
 
 Fig.~\ref{fig:bpcanonical} shows the organization of a typical branch predictor comprising a direction predictor and a target predictor.  The predictor operates in the fetch stage where it aims to predict the program counter (PC), that is the address in memory, of the instruction to fetch in the next cycle using the current instruction's PC and other dynamically collected information. The direction predictor guesses whether the branch will be taken or not. The target predictor guesses the address for predicted as taken branches and function returns respectively. The multiplexer at the end selects based on the branch type and the direction prediction whether the target is the fall through address (PC+4 in Nios~II) or the target predicted by the target predictor. Since, at this point in time, the actual instruction is not available in a typical ASIC implementation, it is not directly possible to determine whether the instruction is a return, a branch, or some other instruction. Accordingly, a Selection Logic block uses either pre-decode information or a PC-based, dynamically populated lookup table to guess which target is best to use. With the latter scheme, when no entry exists in the lookup table, some default action is taken until the first time a branch is encountered. Once the branch executes, its type is stored in the lookup table where it serves to identify the branch type on subsequent encounters. This scheme is not perfectly accurate due to aliasing.
 \kfig{bpcanonical.pdf}{fig:bpcanonical}{Canonical Branch Predictor.}{angle = 0, trim = 0.2in 1.7in 0.4in 0.1in, clip, width=0.4\textwidth}
@@ -65,59 +65,78 @@ Fig.~\ref{fig:bpcanonical} shows the organization of a typical branch predictor 
 \subsection{Design Goals}
 \label{sec:background:goal}
 
-This work aims to implement perceptron and TAGE that has high operating frequency as well as accuracy to maximize execution performance. As section~\ref{sec:tage} will show, a single-cycle TAGE is prohibitively slow. Therefore, this work proposes an overriding TAGE predictor that produces a base prediction in one cycle and overrides that decision with a better prediction if the later prediction differs from the base prediction. Since perceptron and TAGE both requires large storage spaces, on-chip resources is not the main concern of this paper.
+This work aims to implement perceptron and TAGE that has high operating frequency as well as accuracy to maximize execution performance. As section~\ref{sec:scheme:tage} will show, a single-cycle TAGE is prohibitively slow. Therefore, this work proposes an overriding TAGE predictor that produces a base prediction in one cycle and overrides that decision with a better prediction if the later prediction differs from the base prediction. Since perceptron and TAGE both requires large storage spaces, on-chip resources is not the main concern of this paper.
 
-\section{Perceptron Predictor}
-\label{sec:advanced:perceptron}
-The perceptron predictor use vectors of weights (i.e., perceptrons) to represent correlations among branch instructions~\cite{perceptron}. Fig.~\ref{fig:perceptron} shows the structure of a perceptron predictor.
+\section{Branch Prediction Scheme}
+\label{sec:scheme}
+This section discusses the structure of the branch predictors considered, including perceptron and TAGE direction predictor and the target predictor. Sections~\ref{sec:scheme:perceptron} and~\ref{sec:scheme:tage} discusses perceptron and tage, while section~\ref{sec:scheme:target} discusses the target predicor.
 
-Perceptron uses a table to store vectors of weights. When making a prediction, a weight vector is loaded from the table, and each weight is multiplied by the corresponding global branch history (i.e. 1 if taken and -1 if not-taken) from the GHR. Finally, the multiplication results are summed up, and perceptron predicts taken if the sum is positive, and not taken otherwise.
+\subsection{Perceptron Predictor}
+\label{sec:scheme:perceptron}
+The perceptron predictor use vectors of weights (i.e., perceptrons) to represent correlations among branch instructions~\cite{perceptron}. Fig.~\ref{fig:perceptron} shows the structure of a perceptron predictor. 
+
+When making a prediction, a weight vector is loaded from the table. Then, each weight is multiplied by 1 if the corresponding global branch history is taken, and by -1 otherwise. Finally, the products are summed up, the perceptron predicts taken if the sum is positive, and not taken otherwise.
 \kfig{perceptron.pdf}{fig:perceptron}{The preceptron branch predictor.}{angle = 0, trim = 1in 3.5in 2in 1in, clip, width=0.4\textwidth}
 
-
-
-Section~\ref{sec:background:dirpred:perceptron} introduced that perceptron predictor maintains vectors of weights in a table. It produces a prediction through the following steps: (1)~a vector of weight (i.e., a perceptron) is loaded from the table. (2)~multiply the weights with their corresponding global history (1 for taken and -1 for not-taken). (3)~sum up all the products, predict taken if the sum is positive, and not-taken otherwise. Each of these steps poses difficulties to map to the FPGA platform. The rest of this section addresses these problems.
-
-\subsection{Perceptron Table Organization}
-\label{sec:advanced:perceptron:table}
-Each weight in a perceptron is typically 8-bit wide, and perceptron predictors usually use at least 12-bit global history~\cite{perceptron}. The depth of the table, on the other hand, tends to be relatively shallower (e.g. 64 entries for 1KB hardware budget). This requires a very wide but shallow memory, which does not map well to BRAMs on FPGAs. For example, the widest configuration that a M9K BRAM on Altera Stratix IV chip is 36-bit wide times 1k entries. If we implement the 1KB perceptron from~\cite{perceptron}, which uses 96-bit wide perceptrons 12-bit global history
-
-As Fig.~\ref{perceptronBRAM} shows,
-64-entry
-
-
-
-
-\subsection{Multiplication}
-\label{sec:advanced:perceptron:mult}
-
-
-
-\subsection{Adder Tree}
-\label{sec:advanced:perceptron:adder}
-
-
-
-
-
-
-
-
-
-
-
-\section{TAgged GEometric history length Branch Predictor (TAGE)}
-\label{sec:advanced:tage}
-The TAGE predictor features a bimodal predictor as base predictor $T_0$ to provide a basic prediction and a set of $M$ tagged predictor components $T_i$~\cite{tage}. These tagged predictor components $T_i$, where $1\leq i\leq M$, are indexed with hash functions of the branch address and the global branch/path history with various length. The global history lengths used for computing the indexing functions for tables $T_i$ form a geometric series, i.e., $L(i) = (int)(\alpha^{i{}^{\_}1}\times L(1)+0.5)$. TAGE achieves its high accuracy by utilizing very long history lengths
+\subsection{Tagged Geometric History Length Branch Predictor (TAGE)}
+\label{sec:scheme:tage}
+The TAGE predictor features a bimodal predictor as base predictor $T_0$ to provide a basic prediction and a set of $M$ tagged predictor components $T_i$~\cite{tage}. These tagged predictor components $T_i$, where $1\leq i\leq M$, are indexed with hash functions of the branch address and the global branch/path history with various length. The global history lengths used for computing the indexing functions for tables $T_i$ form a geometric series, i.e., $L(i) = (int)(\alpha^{i{}^{\_}1}\times L(1)+0.5)$. TAGE achieves its high accuracy by utilizing very long history lengths.
 
 Fig.~\ref{fig:tage} shows a 5-component TAGE predictor. Each table entry has a 3-bit saturating counter \textit{ctr} for prediction result, a \textit{tag}, and a 2-bit useful counter \textit{u}. The indices of the tables are produced by hashing PC and global history with various lengths. A valid prediction result from each table is provided only on a tag match (i.e. a hit). The final prediction of TAGE comes from the hitting tagged predictor component that uses the longest history.
 \kfig{tage.pdf}{fig:tage}{A 5-component TAGE branch predictor.}{angle = 0, trim = 0.6in 0.6in 0.4in 0.2in, clip, width=0.4\textwidth}
 
 
+\subsection{Branch Target Predictor}
+\label{sec:scheme:target}
+Branch Target Prediction usually requires a Branch Target Buffer (BTB), a cache-like structure that records the addresses of the branches and the target addresses associated with them. If a branch is predicted to be taken and there is also a BTB hit, then the next PC is set to be the predicted target. A BTB can also have set-associativity to reduce the impact from aliasing.
+
+Another common structure for branch target prediction is a Return Address Stack (RAS). It is a stack-like structure that accurately predicts the target address of function returns. When a call instruction executes, the return address of that call is pushed on RAS. When the processor executes the corresponding return instruction, RAS pop the return address and always provides the accurate prediction. Most modern processors have a shallow RAS because typical programs generally do not have very deep call depths. RAS will fail to provide correct target prediction if it is overflowed.
+
+Wu et al. has shown that within the same hardware budget as Nios~II-f (i.e., 1 M9K BRAM), eliminating the BTB and use \textit{Full Address Calculation} (FAC) together with RAS results in better performance~\cite{grselect}. FAC is a technique that calculates the target address in fetch stage to accurately predict target addresses for direct branches, whose target can be calculated based on the instruction itself~\cite{niosii}. Wu et al. has shown that direct branches and returns consist of over 99.8\% of all branches. Implementing FAC with RAS can cover these branches with 100\% accuracy, therefore having a BTB to cover all branches results in negligible improvement in target prediction accuracy. On the other hand, eliminating the BTB and dedicate the entire BRAM for direction prediction improves direction prediction accuracy significantly.
+
+Since we remove the hardware budget constraint in this work, adding a BTB for better target prediction coverage can improve target prediction accuracy. However, our simulations show that the accuracy of the branch predictor is still better without a BTB. This is because when the target predictor only has FAC and RAS, it never predicts indirect branches that are not returns because it is not capable to do so. As a result, the destructive aliasing in the \textbf{direction} predictor is alleviated because less branches are being predicted. Based on this observation, this work uses FAC with RAS as the branch target predictor, which is the same as gRselect.
+
+
+\section{FPGA Implementation Optimizations}
+\label{sec:fpga}
+This section discusses FPGA-specific implementation optimizations for perceptron and TAGE. While this section assumes a modern Altera FPGA, the optimizations presented should be broadly applicable.
+
+\subsection{Perceptron Implementation}
+\label{sec:fpga:perceptron}
+
+Section~\ref{sec:scheme:perceptron} introduced that perceptron predictor maintains vectors of weights in a table. It produces a prediction through the following steps: (1)~a vector of weight (i.e., a perceptron) is loaded from the table. (2)~multiply the weights with their corresponding global history (1 for taken and -1 for not-taken). (3)~sum up all the products, predict taken if the sum is positive, and not-taken otherwise. Each of these steps poses difficulties to map to the FPGA platform. The rest of this section addresses these problems.
+
+\subsubsection{Perceptron Table Organization}
+\label{sec:fpga:perceptron:table}
+Each weight in a perceptron is typically 8-bit wide, and perceptron predictors usually use at least 12-bit global history~\cite{perceptron}. The depth of the table, on the other hand, tends to be relatively shallower (e.g. 64 entries for 1KB hardware budget). This requires a very wide but shallow memory, which does not map well to BRAMs on FPGAs. For example, the widest configuration that a M9K BRAM on Altera Stratix IV chips is 36-bit wide times 1k entries~\cite{StratixIVM9K}. If we implement the 1KB perceptron as proposed by Jim\'enez et al.~\cite{perceptron}, which uses 96-bit wide perceptrons with 12-bit global history, it will result in a huge resource inefficiency as shown in figure~\ref{fig:perceptronTable}. Stratix IV chips have another larger but slower and fewer M144K BRAM on Stratix IV chips~\cite{StratixIVM9K}, which can be configured as wide as 72-bit times 2K entries, clearly the inefficiency problem persists and it would impact maximum operating frequency.
+\kfig{perceptronTable.pdf}{fig:perceptronTable}{Inefficiency using M9K BRAMs to implement wide but shallow perceptron tables.}{angle = 0, trim = 1in 2in 3.4in 0.5in, clip, width=0.3\textwidth}
 
 
 
 
+
+\subsubsection{Multiplication}
+\label{sec:fpga:perceptron:mult}
+
+
+
+\subsubsection{Adder Tree}
+\label{sec:fpga:perceptron:adder}
+
+
+\subsection{TAGE Implementation}
+\label{sec:fpga:tage}
+
+
+
+
+
+
+\section{Evaluation}
+\label{sec:eval}
+Range from 1KB-32KB
+Perceptron doesn't work well
+TAGE overriding with statistic corrector
 
 
 \section{Conclusion}
