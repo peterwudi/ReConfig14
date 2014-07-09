@@ -108,20 +108,24 @@ Section~\ref{sec:scheme:perceptron} introduced that perceptron predictor maintai
 
 \subsubsection{Perceptron Table Organization}
 \label{sec:fpga:perceptron:table}
-Each weight in a perceptron is typically 8-bit wide, and perceptron predictors usually use at least 12-bit global history~\cite{perceptron}. The depth of the table, on the other hand, tends to be relatively shallower (e.g. 64 entries for 1KB hardware budget). This requires a very wide but shallow memory, which does not map well to BRAMs on FPGAs. For example, the widest configuration that a M9K BRAM on Altera Stratix IV chips is 36-bit wide times 1k entries~\cite{StratixIVM9K}. If we implement the 1KB perceptron as proposed by Jim\'enez et al.~\cite{perceptron}, which uses 96-bit wide perceptrons with 12-bit global history, it will result in a huge resource inefficiency as shown in figure~\ref{fig:perceptronTable}. Stratix IV chips have another larger but slower and fewer M144K BRAM on Stratix IV chips~\cite{StratixIVM9K}, which can be configured as wide as 72-bit times 2K entries, clearly the inefficiency problem persists and it would impact maximum operating frequency.
+Each weight in a perceptron is typically 8-bit wide, and perceptron predictors usually use at least 12-bit global history~\cite{perceptron}. The depth of the table, on the other hand, tends to be relatively shallower (e.g. 64 entries for 1KB hardware budget). This requires a very wide but shallow memory, which does not map well to BRAMs on FPGAs. For example, the widest configuration that a M9K BRAM on Altera Stratix IV chips is 36-bit wide times 1k entries~\cite{StratixIVM9K}. If we implement the 1KB perceptron as proposed by Jim\'enez et al.~\cite{perceptron}, which uses 96-bit wide perceptrons with 12-bit global history, it will result in a huge resource inefficiency as shown in Fig~\ref{fig:perceptronTable}. Stratix IV chips have another larger but slower and fewer M144K BRAM on Stratix IV chips~\cite{StratixIVM9K}, which can be configured as wide as 72-bit times 2K entries, clearly the inefficiency problem persists and it would impact maximum operating frequency.
+
+Since typically the perceptron table does not require large storage space, the proposed perceptron implementation uses MLABs as storage, which are fast fine-grain distributed memory resources. Since 50\% of all LABs can be configured as MLAB on Altera Stratix IV devices, using MLABs does not introduce routing difficulty.
 \kfig{perceptronTable.pdf}{fig:perceptronTable}{Inefficiency using M9K BRAMs to implement wide but shallow perceptron tables.}{angle = 0, trim = 1in 2in 3.4in 0.5in, clip, width=0.3\textwidth}
-
-
-
 
 
 \subsubsection{Multiplication}
 \label{sec:fpga:perceptron:mult}
+The multiplication step calculates the products of a weights in a perceptron and their global direction histories. Since the value of the global direction history can only be either 1 or -1, the ``multiplication'' degenerates to two cases, i.e., each product can either be the true form or the 2's compliment (i.e., negative) form of each weight. A straight forward implementation is to calculate the negative of each weight and use a mux to select between them based on the corresponding global history, as shown in Fig.~\ref{fig:perceptronMult}(a). To improve maximum frequency, when updating perceptron in execution stage where the branch is resolved, both positive and negative forms of the updated weight can be calculated, and the negatives can be stored a complement perceptron table. In this way, the multiplication step requires only a 2-to-1 mux, as shown in Fig.~\ref{fig:perceptronMult}(b). As a tradeoff, it requires extra storage for the negative weights.
+\kfig{perceptronMult.pdf}{fig:perceptronMult}{Perceptron multiplication implementation.}{angle = 0, trim = 0.3in 2in 3in 0.6in, clip, width=0.4\textwidth}
 
 
 
 \subsubsection{Adder Tree}
 \label{sec:fpga:perceptron:adder}
+
+
+
 
 
 \subsection{TAGE Implementation}
