@@ -3,9 +3,17 @@
 \usepackage{graphicx}
 \usepackage{amsmath,epsfig, url}
 \usepackage[justification=centering]{caption}
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks   = true, %Colours links instead of ugly boxes
+  urlcolor     = blue, %Colour for external hyperlinks
+  linkcolor    = blue, %Colour of internal links
+  citecolor   = magenta %Colour of citations
+}
 
 
 \hyphenation{Tam-pe-re micro-soft}
+
 
 \newcommand{\kfig}[4]{ % params: file, label, caption
         \begin{figure}[!t]
@@ -138,19 +146,54 @@ Section~\ref{sec:eval:ipc} shows that TAGE predictor is the most accurate amongs
 
 The critical path of TAGE is as follows: it performs a complicated PC based hashing to generate the indices to the tables, compares the tags of the loaded entries to determine whether they are hits or not, finally each decision has to fall through cascaded layers of multiplexers. Although the latency to performing these operations is high, the path can be easily pipelined to achieve much higher operating frequency. Based on this observation, this work explores an overriding branch predictor implementation using TAGE. Overriding branch prediction is a technique to leverage the benefits between fast predictors and accurate predictors. This technique has been used on the Alpha EV8~\cite{alphaEV8} microprocessors. In an overriding predictor, a faster but less accurate base predictor makes a base prediction quickly, and then a slower but more accurate predictor overrides that decision if it disagrees with the base prediction. 
 
-In this work, the base predictor is the simple bimodal predictor included in TAGE it self, i.e., $T_0$ in Fig.~\ref{fig:tage}. The bimodal predictor provides a base prediction in the first cycle, and TAGE provides a prediction at the second cycle. Section~\ref{eval:ipc} and~\ref{eval:fmax} show that the overriding TAGE outperforms all the other branch prediction schemes in terms of both accuracy and maximum frequency.
+In this work, the base predictor is the simple bimodal predictor included in TAGE it self, i.e., $T_0$ in Fig.~\ref{fig:tage}. The bimodal predictor provides a base prediction in the first cycle, and TAGE provides a prediction at the second cycle. Section~\ref{sec:eval:ipc} and~\ref{sec:eval:fmax} show that the overriding TAGE outperforms all the other branch prediction schemes in terms of both accuracy and maximum frequency.
 
 \section{Evaluation}
 \label{sec:eval}
+This section presents the evaluation of the branch predictors considered in this work. Section~\ref{sec:eval:methodology} details the experimental
+methodology. Section~\ref{sec:eval:ipc} compares the accuracy of various direction predictors including bimiodal, gshare, grselect, perceptron and TAGE. It shows that the overriding TAGE is the most accurate. Section~\ref{sec:eval:fmax} reports maximum operating frequency as well as FPGA resource usage. Finally, Section~\ref{sec:eval:ips} reports the overall performance, showing that the overriding TAGE predictor is the best performing predictor.
+
+As discussed in section~\ref{sec:scheme:target}, all the evaluation results presented in this section assumes the same target prediction scheme, which includes a FAC and RAS, the same target predictor used in the gRselect predictor~\cite{grselect}.
+
+\subsection{Methodology}
+\label{sec:eval:methodology}
+% Di: mostly based on the grselect paper, rephrase?
+To compare the predictors this work measures: (1) Accuracy as Instruction Per Cycle (IPC), a frequency agnostic metric that isolates the effects of implementation, (2) Instructions Per Second (IPS), a true measure of performance, (4) Operating frequency, and (5) resource usage. Simulation measures IPC using a custom, cycle-accurate, full-system Nios~II simulator. The simulator boots ucLinux~\cite{uclinux}, and runs a subset of SPEC CPU2006 integer benchmarks with reference inputs~\cite{spec2k6}.
+
+The predictors used as comparison includes bimodal, gshare and grselect. These predictors are implemented faithfully with the same techniques presented by Wu et al.~\cite{grselect}. All designs were implemented in Verilog and synthesized using Quartus II 13.0 on a Stratix IV EP4SE230F29C2 chip in order to measure their maximum clock frequency and area cost. The maximum frequency is reported as the average maximum clock frequency of five placement and routing passes with different random seeds. Area usage is reported in terms of ALUTs used.
+
+
+\subsection{Branch Prediction Accuracy}
+\label{sec:eval:ipc}
+This section first presents data that justify the final design of perceptron and TAGE configurations, then a comparison versus bimodal, gshare and grselect is presented.
+
+\subsubsection{Perceptron}
+\label{sec:eval:ipc:perceptron}
+This work experiments perceptron predictor with hardware budget ranging from 1KB to 32KB. For each of the hardware budget, this work also experiments different configuration with various number of global history bits used.
+
+Fig.~\ref{fig:perceptronIPC} shows the best performing perceptron configuration for each hardware budget. 
+
+
+
+\subsubsection{TAGE}
+\label{sec:eval:ipc:tage}
+
+
+
+\subsubsection{Accuracy Comparison}
 Range from 1KB-32KB
 Perceptron doesn't work well
 TAGE overriding with statistic corrector
 
-\subsection{Direction Prediction}
-\
+
 
 Perceptron HOB accuracy
 % Di: I'll get these data soon...
+
+\subsection{Area}
+\label{sec:eval:area}
+
+%include memory bits? Perceptron does not use BRAMs, but MLABs
 
 
 \section{Conclusion}
