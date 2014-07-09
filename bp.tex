@@ -1,7 +1,7 @@
 \documentclass[conference]{IEEEtran}
 
 \usepackage{graphicx}
-\usepackage{amsmath,epsfig}
+\usepackage{amsmath,epsfig, url}
 \usepackage[justification=centering]{caption}
 
 
@@ -116,14 +116,20 @@ Since typically the perceptron table does not require large storage space, the p
 
 \subsubsection{Multiplication}
 \label{sec:fpga:perceptron:mult}
-The multiplication step calculates the products of a weights in a perceptron and their global direction histories. Since the value of the global direction history can only be either 1 or -1, the ``multiplication'' degenerates to two cases, i.e., each product can either be the true form or the 2's compliment (i.e., negative) form of each weight. A straight forward implementation is to calculate the negative of each weight and use a mux to select between them based on the corresponding global history, as shown in Fig.~\ref{fig:perceptronMult}(a). To improve maximum frequency, when updating perceptron in execution stage where the branch is resolved, both positive and negative forms of the updated weight can be calculated, and the negatives can be stored a complement perceptron table. In this way, the multiplication step requires only a 2-to-1 mux, as shown in Fig.~\ref{fig:perceptronMult}(b). As a tradeoff, it requires extra storage for the negative weights.
+The multiplication stage calculates the products of a weights in a perceptron and their global direction histories. Since the value of the global direction history can only be either 1 or -1, the ``multiplication'' degenerates to two cases, i.e., each product can either be the true form or the 2's compliment (i.e., negative) form of each weight. A straight forward implementation is to calculate the negative of each weight and use a mux to select between them based on the corresponding global history, as shown in Fig.~\ref{fig:perceptronMult}(a). To improve maximum frequency, when updating perceptron in execution stage where the branch is resolved, both positive and negative forms of the updated weight can be calculated, and the negatives can be stored a complement perceptron table. In this way, the multiplication stage requires only a 2-to-1 mux, as shown in Fig.~\ref{fig:perceptronMult}(b). As a tradeoff, it requires extra storage for the negative weights.
 \kfig{perceptronMult.pdf}{fig:perceptronMult}{Perceptron multiplication implementation.}{angle = 0, trim = 0.3in 2in 3in 0.6in, clip, width=0.4\textwidth}
-
-
 
 \subsubsection{Adder Tree}
 \label{sec:fpga:perceptron:adder}
+The adder tree sums the products from the multiplication stage. As Section~\ref{sec:eval:ipc} will show, at least 16 global histories has to be used to achieve sufficient accuracy. Implementing a 16-to-1 adder tree for 8-bit integers na\''ively degrades maximum frequency severally. The maximum frequency has to be improved for perceptron to be a practical implementaion.
 
+This work employs \textit{Low Order Bit (LOB) Elimination} proposed by Aasaraai et al.~\cite{lob}. The idea is to ignore the Low Order Bits (LOBs) of each weight and only use the High Order Bits (HOBs) during prediction, but use all the bits during update.
+% Di: I'll get these data soon...
+Fig.~\ref{fig:lob} shows that eliminating xxx bits is only xxx\% less accurate than using all 8 bits, but summing fewer bits results in significantly higher maximum frequency. 
+
+
+
+Our experiments have shown that using 3 HOB for prediction 
 
 
 
